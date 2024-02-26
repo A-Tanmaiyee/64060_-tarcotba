@@ -1,0 +1,199 @@
+---
+title: "Assignment 2"
+author: "Tanmaiyee"
+date: "2024-02-24"
+output:
+  html_document: default
+  word_document: default
+---
+
+
+### Loading the data.
+```{r}
+library(readr)
+UniversalBank <- read_csv("UniversalBank.csv")
+View(UniversalBank)
+```
+
+### normalizing the data
+
+```{r}
+library(caret)
+Normal_Data <- preProcess(UniversalBank, method = "range")
+UniversalBank_Norm <- predict(Normal_Data,UniversalBank)
+summary(UniversalBank_Norm)
+```
+
+### Partioning the data into training and validation sets
+
+```{r}
+library(caret)
+library(pROC)
+set.seed(123)
+Train_index <- createDataPartition(UniversalBank$Income, p = 0.6, list = FALSE)
+train.df = UniversalBank_Norm[Train_index,] 
+valid.df = UniversalBank_Norm[-Train_index,]
+```
+
+### normalizing the partitioned data
+
+```{r}
+train.norm.df <- train.df[,-10] 
+valid.norm.df <- valid.df[,-10]
+
+norm.values <- preProcess(train.df[, -10], method=c("center", "scale"))
+
+train.norm.df <- predict(norm.values, train.df[, -10])
+valid.norm.df <- predict(norm.values, valid.df[,-10])
+```
+
+
+### Q1. Perform a k-NN classification with all predictors except ID and ZIP code using k = 1. 
+
+```{r}
+UniversalBank_ID <- UniversalBank[,-1]
+UniversalBank_ZIP.Code <- UniversalBank[,-5]
+summary(UniversalBank)
+```
+
+
+```{r}
+UniversalBank$Education <- as.factor(UniversalBank$Education)
+New_Customer <- data.frame( Age = 40,
+  Experience = 10,
+  Income = 84,
+  Family = 2,
+  CCAvg = 2,
+  Education = 1,
+  Mortgage = 0,
+  Securities.Account = 0,
+  CD.Account = 0,
+  Online = 1,
+  CreditCard = 1)
+print(New_Customer)
+```
+
+
+### when k=1
+
+```{r}
+library(class) # install class first
+library(caret)
+library(ISLR)
+Pred_Uni <- knn(train = train.df[,1:7],test = New_Customer[,1:7], cl = train.df$Income, k = 1)
+print(Pred_Uni)
+```
+Customer is classified as 1
+
+### Q2.Choice of k that balances between overfitting and ignoring the predictor information
+
+```{r}
+set.seed(2808)
+UniversalBank_control <- trainControl(method= "repeatedcv", number = 5, repeats = 2) 
+searchGrid <-  expand.grid(k=1:10)
+model <- train(Income~., data = train.df, method = 'knn')
+model
+```
+
+The choice of K that balances between overfitting and ignoring predictor is K=5
+
+### Q3. 3.	Confusion matrix for the validation data that results from using the best k. 
+
+```{r}
+library(gmodels)
+knn.prediction3 <- class::knn(train = train.norm.df,
+                              test = valid.norm.df,
+                              cl = train.df$Income, k=3)
+head(knn.prediction3)
+#Confusion Matrix
+CrossTable(x=head(as.factor(valid.df$Income)),y= head(knn.prediction3),prop.chisq = FALSE)
+```
+
+### Q4. 4.	Consider the following customer: Age = 40, Experience = 10, Income = 84, Family = 2, CCAvg = 2, Education_1 = 0, Education_2 = 1, Education_3 = 0, Mortgage = 0, Securities Account = 0, CD Account = 0, Online = 1 and Credit Card = 1. Classify the customer using the best k. 
+```{r}
+New_Customer1 <- data.frame( Age = 40,
+  Experience = 10,
+  Income = 84,
+  Family = 2,
+  CCAvg = 2,
+  Education.1 = 0,
+  Education.2 = 1,
+  Education.3 = 0,
+  Mortgage = 0,
+  Securities.Account = 0,
+  CD.Account = 0,
+  Online = 1,
+  CreditCard = 1)
+New_Customer1_normalising <- New_Customer1
+#
+knn.prediction4 <- knn(train = train.norm.df,
+                       test = New_Customer1_normalising,
+                       cl = train.df$Income, k=3)
+head(knn.prediction4)
+```
+
+
+### Q5. Repartition the data, this time into training, validation, and test sets (50% : 30% : 20%). Apply the k-NN method with the k chosen above. Compare the confusion matrix of the test set with that of the training and validation sets. Comment on the differences and their reason.
+
+```{r}
+set.seed(1)  
+
+train.index1 <- sample(row.names(UniversalBank), 0.5*dim(UniversalBank)[1])
+train.df1 <-UniversalBank[train.index1,]
+
+valid.index1 <- setdiff(row.names(UniversalBank), train.index1)
+valid.df1 <- UniversalBank[valid.index1, ]
+
+valid.index2 <- sample(row.names(valid.df1), 0.6*dim(valid.df1)[1])
+valid.df2 <- valid.df1[valid.index2, ]
+
+test.index1 <- setdiff(row.names(valid.df1),valid.index2)
+test.df1 <- valid.df1[test.index1, ]
+```
+
+
+```{r}
+train.norm.df1 <- train.df1[,-10]
+valid.norm.df2 <- valid.df2[,-10]
+test.norm.df1 <- test.df1[,-10]
+
+norm.values1 <- preProcess(train.df1[,-10], method = c("center", "scale"))
+
+train.norm.df1 <- predict(norm.values1, train.df1[,-10])
+valid.norm.df2 <- predict(norm.values1, valid.df2[,-10])
+
+test.norm.df1 <- predict(norm.values1, test.df1[,-10])
+```
+
+
+```{r}
+library(gmodels)
+knn.prediction5 <- class::knn(train = train.norm.df1,
+                        test = train.norm.df1,
+                        cl= train.df1$Income, k= 3)
+head(knn.prediction5)
+CrossTable(x=head(knn.prediction5),y=head(as.factor(train.df1$Income),prop.chisq = FALSE))
+```
+
+```{r}
+library(gmodels)
+knn.prediction6 <- class::knn(train = train.norm.df1,
+                        test = valid.norm.df2,
+                        cl= train.df1$Income, k= 3)
+head(knn.prediction6)
+CrossTable(x=head(knn.prediction6),y=head(as.factor(train.df1$Income)),prop.chisq = FALSE)
+```
+
+```{r}
+library(gmodels)
+knn.prediction7 <- class::knn(train = train.norm.df1,
+                        test = test.norm.df1,
+                        cl= train.df1$Income, k= 3)
+head(knn.prediction7)
+CrossTable(x=head(knn.prediction7),y=head(as.factor(train.df1$Income)),prop.chisq = FALSE)
+```
+
+Hence, from the above analysis it can be inferred that the training accuracy slightly outperforms the accuracy of the test and validation sets. 
+
+
+
