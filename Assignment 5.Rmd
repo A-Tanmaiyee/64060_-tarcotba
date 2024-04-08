@@ -1,0 +1,233 @@
+---
+title: "tarcotba A5"
+author: "Tanmaiyee"
+date: "2024-04-07"
+output: html_document
+---
+
+## Summary: The below analysis shows in detail the best method which can be used in this scenario for clustering, the number of clusters which can be used, model stability and finally the based on the data set the cluster which shows the healthy cereal content.
+
+
+### Purpose: The purpose of this assignment is to use Hierarchical Clustering
+
+#### Loading the data
+```{r}
+library(readr)
+Cereals <- read_csv("Cereals.csv")
+head(Cereals)
+str(Cereals)
+```
+
+#### Loading the required libraries
+```{r}
+library(tidyverse)
+library(caret)
+library(dplyr)
+library(cluster)
+library(factoextra)
+library(flexclust)
+library(knitr)
+```
+
+#### Scaling the data set.
+```{r}
+#scaling is done for the numeric values
+numeric_Cereals <- Cereals %>% select_if(is.numeric)
+head(numeric_Cereals)
+Cereals_norm <- as.data.frame(scale(numeric_Cereals))
+Cereals_DF <- na.omit(Cereals_norm)
+str(Cereals_DF)
+```
+
+
+***
+
+#### Question 1 
+
+```{r}
+# Setting the Euclidean distance
+Cereals_Euc<- dist(Cereals_norm, method = "euclidean")
+```
+
+
+##### Perform hierarchical clustering via the single linkage method 
+```{r}
+Cereals_single_linkage <- agnes(Cereals_Euc, method = "single") 
+# Plotting the results
+plot(Cereals_single_linkage,  
+     main = "Customer Cereal Ratings - AGNES - Single Linkage Method",      xlab = "Cereal",      ylab = "Height",      cex.axis = 1,      cex = 0.56,      hang = -1) 
+```
+
+
+##### Perform hierarchical clustering via the complete linkage method
+```{r}
+Cereals_comp_linkage <- agnes(Cereals_Euc, method = "complete") 
+# Plotting the results
+plot(Cereals_comp_linkage,  
+     main = "Customer Cereal Ratings - AGNES - Complete Linkage Method",      xlab = "Cereal",      ylab = "Height",      cex.axis = 1,      cex = 0.56,      hang = -1) 
+
+```
+
+
+##### Perform hierarchical clustering via the average linkage method
+```{r}
+Cereals_average_linkage <- agnes(Cereals_Euc, method = "average") 
+# Plotting the results
+plot(Cereals_average_linkage,  
+     main = "Customer Cereal Ratings - AGNES - Average Linkage Method",      xlab = "Cereal",      ylab = "Height",      cex.axis = 1,      cex = 0.56,      hang = -1) 
+
+```
+
+
+##### Perform hierarchical clustering via the ward linkage method
+```{r}
+Cereals_ward_linkage <- agnes(Cereals_Euc, method = "ward") 
+# Plotting the results
+plot(Cereals_ward_linkage,  
+     main = "Customer Cereal Ratings - AGNES - Ward Linkage Method",      xlab = "Cereal",      ylab = "Height",      cex.axis = 1,      cex = 0.56,      hang = -1) 
+```
+
+
+Based off of the agglomerative coefficients, we can determine that the **WARD** method is the best linkage method in this scenario with a coefficient of **0.9**.
+
+***
+
+#### Question 2 
+
+```{r}
+# Determine the optimal number of clusters for the dataset via the silhouette method 
+fviz_nbclust(Cereals_norm,hcut,  
+             method = "silhouette",  
+             k.max = 26) + 
+  labs(title = "Optimal Number of Clusters - Silhouette Method") 
+# Plotting of the Ward hierarchical tree with the 12 clusters 
+plot(Cereals_ward_linkage,  
+     main = "AGNES - Ward Linkage Method - 12 Clusters Outlined",      xlab = "Cereal",      ylab = "Height",      cex.axis = 1,      cex = 0.56,      hang = -1) 
+rect.hclust(Cereals_ward_linkage, k = 12, border = 1:12) 
+```
+
+Based on the value obtained through silhouette method we can conclude that the optimum number of clusters are 12.
+
+***
+
+#### Question 3
+
+```{r}
+clust1 <- cutree(Cereals_ward_linkage, k=12)
+Norm_cereal_data <- as.data.frame(cbind(Cereals_norm,clust1))
+```
+
+##### Partitioning the data into group A & B
+
+```{r}
+set.seed(123)
+newdata <- createDataPartition(Cereals_DF$protein, p=0.3, list = F) 
+Cereals_Train <- Cereals_DF[newdata, ] 
+Cereals_Test <- Cereals_DF[-newdata,] 
+
+
+# Conducting hierarchical clustering with a consideration for K = 12.
+# Removing the columns 1-3 as they are characters.
+Cereals_ward <- agnes(Cereals_Train,method = "ward")
+Cereals_average <- agnes(Cereals_Train,method="average")
+Cereals_complete <- agnes(Cereals_Train,method="complete")
+Cereals_single <- agnes(Cereals_Train,method="single")
+
+kable(cbind(ward=Cereals_ward$ac,average=Cereals_average$ac,complete=Cereals_complete$ac,single=Cereals_single$ac))
+```
+
+##### Since the Ward linkage method has the highest agglomerative coefficient it is chosen.
+```{r}
+plot(Cereals_ward,  
+     main = "Dendogram of AGNES - Ward Linkage",      xlab = "Cereal",      ylab = "Height",      cex.axis = 1,      cex = 0.56,      hang = -1) 
+rect.hclust(Cereals_ward, k = 12, border = 1:12) 
+```
+
+##### Combining the normalized cereal data with the cluster assignments
+```{r}
+clust2 <- cutree(Cereals_ward, k=12)
+result <- as.data.frame(cbind(Cereals_Train,clust2))
+```
+
+```{r}
+#First Centroid
+center1 <- colMeans(result[result$clust2==1,])
+result[result$clust2==2,]
+```
+```{r}
+#Second Centroid
+center2<-colMeans(result[result$clust2==2,])
+result[result$clust2==3,]
+```
+
+```{r}
+#Third Centroid
+center3<-colMeans(result[result$clust2==3,])
+result[result$clust2==4,]
+```
+
+```{r}
+# Fourth Centroid
+center4<-colMeans(result[result$clust2==4,])
+centers<-rbind(center1,center2,center3,center4)
+
+# Combining the cluster centers with the test data
+Cluster_centers <- as.data.frame(rbind(centers[,-14],Cereals_Test))
+
+# Computing the distances between each point in x2 and all cluster centers
+Distances <- get_dist(Cluster_centers)
+
+# Converting the distance object to a matrix
+Mat <- as.matrix(Distances)
+
+# Creating a data frame to store the cluster assignments
+Cereals_new <- data.frame(data=seq(1,nrow(Cereals_Test),1),clusters=rep(0,nrow(Cereals_Test)))
+
+# Assigning each record in Test data to the closest centroid
+for(i in 1:nrow(Cereals_Test))
+{
+  Cereals_new[i,2]<-which.min(Mat[i+nrow(centers),1:ncol(centers)])
+}
+print(Cereals_new)
+
+# Comparing the assigned clusters
+comparison <- table(Norm_cereal_data$clust1[56:74] == Cereals_new$clusters)
+table(Norm_cereal_data$clust1[56:74]== Cereals_new$clusters)
+```
+
+
+Because there aren't many "TRUE" values, the model shows that it is significantly **unstable**.
+
+***
+
+#### Question 4
+
+```{r}
+healthy_cereals <- Cereals_DF[, c(4,5,6,8,9,10,11,12)]
+# Applying euclidean method
+Euc_new <- dist(healthy_cereals, method = "euclidean")
+New_clust <- hclust(Euc_new, method = "ward.D2")
+#Creating 12 clusters as value of k is 12
+Cereals_DF$cluster <- cutree(New_clust, k = 12)
+Final_data <- aggregate(. ~ cluster, data = Cereals_DF, FUN = mean)
+Final_data
+```
+
+
+The data must be normalized first to get the accurate comparisons between the clusters. Here we are already using the normalized data.
+
+Low Calorie: Out of all the clusters, Cluster 1 has the lowest calories with a value of **-2.23514255**
+
+High Protein: Of all the clusters, Cluster 1 has the largest protein content with the value of **1.32860712**
+
+Low Fat and Sugar: Cluster 1 has comparatively low fat and sugar in combination intake with a value of **-0.34409318** and **-0.7672786**.
+
+High Fiber: Cluster 1 facilitates digestion and encourages satiety with a value of **3.71242164**
+
+Overall, **Cluster 1** has a balanced nutritional profile, including sufficient amounts of vitamins and minerals, including potassium, that are necessary for general health and well being.
+
+
+
+
+
+
